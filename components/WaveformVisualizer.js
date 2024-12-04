@@ -21,14 +21,14 @@ export function WaveformVisualizer() {
       audioEncoder: Audio.RECORDING_OPTION_ANDROID_AUDIO_ENCODER_AAC,
       sampleRate: 44100,
       numberOfChannels: 2,
-      bitRate: 128000,
+      bitRate: 256000,
     },
     ios: {
       extension: '.m4a',
       audioQuality: Audio.RECORDING_OPTION_IOS_AUDIO_QUALITY_HIGH,
       sampleRate: 44100,
       numberOfChannels: 2,
-      bitRate: 128000,
+      bitRate: 256000,
       linearPCMBitDepth: 16,
       linearPCMIsBigEndian: false,
       linearPCMIsFloat: false,
@@ -84,7 +84,7 @@ export function WaveformVisualizer() {
     }
   };
 
-  // Play or replay the audio
+
   const togglePlayback = async () => {
     if (!sound) return;
   
@@ -92,14 +92,14 @@ export function WaveformVisualizer() {
       await sound.pauseAsync();
       setIsPlaying(false);
     } else {
-      // Reset playback and playhead if the audio is finished
+
       if (playheadPosition >= amplitudes.length) {
-        await sound.stopAsync(); // Stop the sound to reset it
-        await sound.playFromPositionAsync(0); // Start from the beginning
-        setPlayheadPosition(0); // Reset playhead position
+        await sound.stopAsync(); 
+        await sound.playFromPositionAsync(0); 
+        setPlayheadPosition(0); 
       }
   
-      await sound.setVolumeAsync(1.0); // Ensure playback volume is set to maximum
+      await sound.setVolumeAsync(1.0);
       await sound.playAsync();
       setIsPlaying(true);
   
@@ -111,7 +111,7 @@ export function WaveformVisualizer() {
         }
         if (status.didJustFinish) {
           setIsPlaying(false);
-          setPlayheadPosition(amplitudes.length); // Set playhead to the end
+          setPlayheadPosition(amplitudes.length); 
         }
       });
     }
