@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
 import { Audio } from 'expo-av';
 import Svg, { Rect, Circle } from 'react-native-svg';
@@ -10,7 +10,6 @@ export function WaveformVisualizer() {
   const [isRecording, setIsRecording] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [playheadPosition, setPlayheadPosition] = useState(0);
-  const [isReplay, setIsReplay] = useState(false); // To track if it's a replay
 
   const animationInterval = useRef(null);
 
@@ -21,22 +20,21 @@ export function WaveformVisualizer() {
       outputFormat: Audio.RECORDING_OPTION_ANDROID_OUTPUT_FORMAT_MPEG_4,
       audioEncoder: Audio.RECORDING_OPTION_ANDROID_AUDIO_ENCODER_AAC,
       sampleRate: 44100,
-      numberOfChannels: 1,
-      bitRate: 64000,
+      numberOfChannels: 2,
+      bitRate: 128000,
     },
     ios: {
       extension: '.m4a',
       audioQuality: Audio.RECORDING_OPTION_IOS_AUDIO_QUALITY_HIGH,
       sampleRate: 44100,
-      numberOfChannels: 1,
-      bitRate: 64000,
+      numberOfChannels: 2,
+      bitRate: 128000,
       linearPCMBitDepth: 16,
       linearPCMIsBigEndian: false,
       linearPCMIsFloat: false,
     },
   };
 
-  // Start recording
   const startRecording = async () => {
     try {
       const permission = await Audio.requestPermissionsAsync();
@@ -89,21 +87,22 @@ export function WaveformVisualizer() {
   // Play or replay the audio
   const togglePlayback = async () => {
     if (!sound) return;
-
+  
     if (isPlaying) {
       await sound.pauseAsync();
       setIsPlaying(false);
     } else {
-      // Reset playhead if replaying
+      // Reset playback and playhead if the audio is finished
       if (playheadPosition >= amplitudes.length) {
-        setPlayheadPosition(0);
+        await sound.stopAsync(); // Stop the sound to reset it
+        await sound.playFromPositionAsync(0); // Start from the beginning
+        setPlayheadPosition(0); // Reset playhead position
       }
-
-      setIsReplay(playheadPosition >= amplitudes.length); // Set replay mode
-
+  
+      await sound.setVolumeAsync(1.0); // Ensure playback volume is set to maximum
       await sound.playAsync();
       setIsPlaying(true);
-
+  
       sound.setOnPlaybackStatusUpdate((status) => {
         if (status.isLoaded && status.positionMillis) {
           const progress =
@@ -113,13 +112,13 @@ export function WaveformVisualizer() {
         if (status.didJustFinish) {
           setIsPlaying(false);
           setPlayheadPosition(amplitudes.length); // Set playhead to the end
-          setIsReplay(true); // Set to replay mode after first playback
         }
       });
     }
   };
-
-  // Render WhatsApp-like waveform
+  
+  
+  // Render waveform
   const renderWaveform = () => {
     const barWidth = 4; // Width of each bar
     const barSpacing = 2; // Spacing between bars
@@ -133,13 +132,7 @@ export function WaveformVisualizer() {
         width={barWidth}
         height={value}
         rx={2} // Rounded corners
-        fill={
-          isReplay
-            ? '#B9B9B9' // Gray static waveform for replay
-            : index <= playheadPosition
-            ? '#0ABAB5' // Active color for bars
-            : '#E0E0E0' // Inactive color for bars
-        }
+        fill={index <= playheadPosition ? '#0ABAB5' : '#E0E0E0'} // Dynamic color
       />
     ));
   };
