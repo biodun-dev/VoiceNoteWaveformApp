@@ -52,10 +52,7 @@ export function WaveformVisualizer() {
       setIsRecording(true);
 
       animationInterval.current = setInterval(() => {
-        setAmplitudes((prev) => [
-          ...prev.slice(-50), 
-          Math.random() * 80 + 20, 
-        ]);
+        setAmplitudes((prev) => [...prev.slice(-50), Math.random() * 80 + 20]);
       }, 100);
     } catch (err) {
       console.error('Error starting recording:', err);
@@ -68,12 +65,16 @@ export function WaveformVisualizer() {
 
       clearInterval(animationInterval.current);
       await recording.stopAndUnloadAsync();
-      setRecording(null);
-      setIsRecording(false);
+
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: false,
+        playsInSilentModeIOS: true,
+      });
 
       const { sound } = await recording.createNewLoadedSoundAsync();
       setSound(sound);
-
+      setRecording(null);
+      setIsRecording(false);
       setAmplitudes((prev) => [...prev]);
     } catch (err) {
       console.error('Error stopping recording:', err);
@@ -81,24 +82,25 @@ export function WaveformVisualizer() {
   };
 
 
+
   const togglePlayback = async () => {
     if (!sound) return;
-  
+
     if (isPlaying) {
       await sound.pauseAsync();
       setIsPlaying(false);
     } else {
 
       if (playheadPosition >= amplitudes.length) {
-        await sound.stopAsync(); 
-        await sound.playFromPositionAsync(0); 
-        setPlayheadPosition(0); 
+        await sound.stopAsync();
+        await sound.playFromPositionAsync(0);
+        setPlayheadPosition(0);
       }
-  
+
       await sound.setVolumeAsync(1.0);
       await sound.playAsync();
       setIsPlaying(true);
-  
+
       sound.setOnPlaybackStatusUpdate((status) => {
         if (status.isLoaded && status.positionMillis) {
           const progress =
@@ -107,26 +109,26 @@ export function WaveformVisualizer() {
         }
         if (status.didJustFinish) {
           setIsPlaying(false);
-          setPlayheadPosition(amplitudes.length); 
+          setPlayheadPosition(amplitudes.length);
         }
       });
     }
   };
-  
-  
+
+
   const renderWaveform = () => {
-    const barWidth = 4; 
-    const barSpacing = 2; 
+    const barWidth = 4;
+    const barSpacing = 2;
     const centerY = 50;
 
     return amplitudes.map((value, index) => (
       <Rect
         key={index}
         x={index * (barWidth + barSpacing)}
-        y={centerY - value / 2} 
+        y={centerY - value / 2}
         width={barWidth}
         height={value}
-        rx={2} 
+        rx={2}
         fill={index <= playheadPosition ? '#0ABAB5' : '#E0E0E0'}
       />
     ));
@@ -154,9 +156,8 @@ export function WaveformVisualizer() {
       <View style={styles.waveformContainer}>
         <Svg height="100" width="100%">
           {renderWaveform()}
-          {/* Playhead */}
           <Circle
-            cx={playheadPosition * 6} 
+            cx={playheadPosition * 6}
             cy="50"
             r="5"
             fill="#0ABAB5"
