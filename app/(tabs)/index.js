@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { Image, StyleSheet, Platform } from 'react-native';
+import { Image, StyleSheet, Platform,Animated } from 'react-native';
 import {View, TouchableOpacity, ScrollView, Text } from 'react-native';
 import { Audio } from 'expo-av';
 import Svg, { Rect, Circle } from 'react-native-svg';
