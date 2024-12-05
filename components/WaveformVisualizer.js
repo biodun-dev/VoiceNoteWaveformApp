@@ -1,15 +1,13 @@
 import React, { useState, useRef } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
+import { StyleSheet, View, TouchableOpacity, ScrollView } from 'react-native';
 import { Audio } from 'expo-av';
-import Svg, { Rect, Circle } from 'react-native-svg';
+import Svg, { Rect, Circle, Line } from 'react-native-svg';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 
 export function WaveformVisualizer() {
-  const [recording, setRecording] = useState(null);
-  const [sound, setSound] = useState(null);
-  const [amplitudes, setAmplitudes] = useState([]);
+  const [recordings, setRecordings] = useState([]);
+  const [currentRecording, setCurrentRecording] = useState(null);
   const [isRecording, setIsRecording] = useState(false);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [playheadPosition, setPlayheadPosition] = useState(0);
 
   const animationInterval = useRef(null);
 
@@ -48,11 +46,11 @@ export function WaveformVisualizer() {
       });
 
       const { recording } = await Audio.Recording.createAsync(RECORDING_OPTIONS);
-      setRecording(recording);
+      setCurrentRecording(recording);
       setIsRecording(true);
 
       animationInterval.current = setInterval(() => {
-        setAmplitudes((prev) => [...prev.slice(-50), Math.random() * 80 + 20]);
+        // Simulate waveform animation (real amplitude capture can be added here)
       }, 100);
     } catch (err) {
       console.error('Error starting recording:', err);
@@ -61,109 +59,117 @@ export function WaveformVisualizer() {
 
   const stopRecording = async () => {
     try {
-      if (!recording) return;
+      if (!currentRecording) return;
 
       clearInterval(animationInterval.current);
-      await recording.stopAndUnloadAsync();
+      await currentRecording.stopAndUnloadAsync();
 
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: false,
         playsInSilentModeIOS: true,
       });
 
-      const { sound } = await recording.createNewLoadedSoundAsync();
-      setSound(sound);
-      setRecording(null);
+      const { sound } = await currentRecording.createNewLoadedSoundAsync();
+      setRecordings((prev) => [
+        ...prev,
+        { sound, amplitudes: [...Array(50).keys()].map(() => Math.random() * 40 + 20) },
+      ]);
+      setCurrentRecording(null);
       setIsRecording(false);
-      setAmplitudes((prev) => [...prev]);
     } catch (err) {
       console.error('Error stopping recording:', err);
     }
   };
 
+  const togglePlayback = async (index) => {
+    const recording = recordings[index];
+    if (!recording) return;
 
-
-  const togglePlayback = async () => {
-    if (!sound) return;
+    const { sound, isPlaying } = recording;
 
     if (isPlaying) {
       await sound.pauseAsync();
-      setIsPlaying(false);
+      updateRecordingState(index, { isPlaying: false });
     } else {
-
-      if (playheadPosition >= amplitudes.length) {
-        await sound.stopAsync();
-        await sound.playFromPositionAsync(0);
-        setPlayheadPosition(0);
-      }
-
-      await sound.setVolumeAsync(1.0);
-      await sound.playAsync();
-      setIsPlaying(true);
+      await sound.replayAsync();
+      updateRecordingState(index, { isPlaying: true });
 
       sound.setOnPlaybackStatusUpdate((status) => {
-        if (status.isLoaded && status.positionMillis) {
-          const progress =
-            (status.positionMillis / status.durationMillis) * amplitudes.length;
-          setPlayheadPosition(progress);
-        }
-        if (status.didJustFinish) {
-          setIsPlaying(false);
-          setPlayheadPosition(amplitudes.length);
+        if (status.isLoaded) {
+          const playheadPosition = (status.positionMillis / status.durationMillis) * 100;
+          updateRecordingState(index, { playheadPosition });
+
+          if (status.didJustFinish) {
+            updateRecordingState(index, { isPlaying: false, playheadPosition: 0 });
+          }
         }
       });
     }
   };
 
+  const updateRecordingState = (index, updates) => {
+    setRecordings((prev) =>
+      prev.map((rec, i) => (i === index ? { ...rec, ...updates } : rec))
+    );
+  };
 
-  const renderWaveform = () => {
+  const renderWaveform = (amplitudes, playheadPosition) => {
     const barWidth = 4;
     const barSpacing = 2;
     const centerY = 50;
 
-    return amplitudes.map((value, index) => (
-      <Rect
-        key={index}
-        x={index * (barWidth + barSpacing)}
-        y={centerY - value / 2}
-        width={barWidth}
-        height={value}
-        rx={2}
-        fill={index <= playheadPosition ? '#0ABAB5' : '#E0E0E0'}
-      />
-    ));
+    return (
+      <Svg height="100" width="100%">
+        {amplitudes.map((value, index) => (
+          <Rect
+            key={index}
+            x={index * (barWidth + barSpacing)}
+            y={centerY - value / 2}
+            width={barWidth}
+            height={value}
+            rx={2}
+            fill={index <= playheadPosition ? '#0ABAB5' : '#E0E0E0'}
+          />
+        ))}
+        <Line
+          x1={playheadPosition * (barWidth + barSpacing)}
+          y1="0"
+          x2={playheadPosition * (barWidth + barSpacing)}
+          y2="100"
+          stroke="white"
+          strokeWidth="2"
+        />
+      </Svg>
+    );
   };
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Voice Note Waveform</Text>
-      {isRecording ? (
-        <TouchableOpacity style={styles.button} onPress={stopRecording}>
-          <Text style={styles.buttonText}>Stop Recording</Text>
-        </TouchableOpacity>
-      ) : (
-        <TouchableOpacity style={styles.button} onPress={startRecording}>
-          <Text style={styles.buttonText}>Start Recording</Text>
-        </TouchableOpacity>
-      )}
-      {sound && (
-        <TouchableOpacity style={styles.button} onPress={togglePlayback}>
-          <Text style={styles.buttonText}>
-            {isPlaying ? 'Pause' : playheadPosition >= amplitudes.length ? 'Replay' : 'Play'}
-          </Text>
-        </TouchableOpacity>
-      )}
-      <View style={styles.waveformContainer}>
-        <Svg height="100" width="100%">
-          {renderWaveform()}
-          <Circle
-            cx={playheadPosition * 6}
-            cy="50"
-            r="5"
-            fill="#0ABAB5"
-          />
-        </Svg>
+      <View style={styles.controls}>
+        {isRecording ? (
+          <TouchableOpacity onPress={stopRecording}>
+            <Ionicons name="stop-circle" size={50} color="#FF3B30" />
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity onPress={startRecording}>
+            <Ionicons name="mic-circle" size={50} color="#0ABAB5" />
+          </TouchableOpacity>
+        )}
       </View>
+      <ScrollView style={styles.recordingsList}>
+        {recordings.map((recording, index) => (
+          <View key={index} style={styles.recordingItem}>
+            <TouchableOpacity onPress={() => togglePlayback(index)}>
+              <Ionicons
+                name={recording.isPlaying ? 'pause-circle' : 'play-circle'}
+                size={40}
+                color="#0ABAB5"
+              />
+            </TouchableOpacity>
+            {renderWaveform(recording.amplitudes, recording.playheadPosition || 0)}
+          </View>
+        ))}
+      </ScrollView>
     </View>
   );
 }
@@ -171,31 +177,21 @@ export function WaveformVisualizer() {
 const styles = StyleSheet.create({
   container: {
     marginVertical: 16,
+    flex: 1,
   },
-  title: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 8,
+  controls: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginVertical: 16,
   },
-  button: {
-    backgroundColor: '#0ABAB5',
-    padding: 10,
-    borderRadius: 5,
-    marginVertical: 10,
-  },
-  buttonText: {
-    color: 'white',
-    fontWeight: 'bold',
-    textAlign: 'center',
-  },
-  waveformContainer: {
+  recordingsList: {
     marginTop: 16,
-    width: '100%',
-    height: 100,
+  },
+  recordingItem: {
+    marginBottom: 16,
     backgroundColor: '#1F2A30',
     borderRadius: 8,
-    overflow: 'hidden',
-    flexDirection: 'row',
-    alignItems: 'center',
+    padding: 10,
   },
 });
