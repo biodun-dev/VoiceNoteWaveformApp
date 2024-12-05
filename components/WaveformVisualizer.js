@@ -13,7 +13,6 @@ export function WaveformVisualizer() {
 
   const animationInterval = useRef(null);
 
-  // Custom recording options
   const RECORDING_OPTIONS = {
     android: {
       extension: '.m4a',
@@ -52,11 +51,10 @@ export function WaveformVisualizer() {
       setRecording(recording);
       setIsRecording(true);
 
-      // Generate amplitudes during recording
       animationInterval.current = setInterval(() => {
         setAmplitudes((prev) => [
-          ...prev.slice(-50), // Keep the last 50 amplitudes
-          Math.random() * 80 + 20, // Simulate random amplitude with a minimum height
+          ...prev.slice(-50), 
+          Math.random() * 80 + 20, 
         ]);
       }, 100);
     } catch (err) {
@@ -64,7 +62,6 @@ export function WaveformVisualizer() {
     }
   };
 
-  // Stop recording
   const stopRecording = async () => {
     try {
       if (!recording) return;
@@ -77,7 +74,6 @@ export function WaveformVisualizer() {
       const { sound } = await recording.createNewLoadedSoundAsync();
       setSound(sound);
 
-      // Stop updating amplitudes after recording
       setAmplitudes((prev) => [...prev]);
     } catch (err) {
       console.error('Error stopping recording:', err);
@@ -118,21 +114,20 @@ export function WaveformVisualizer() {
   };
   
   
-  // Render waveform
   const renderWaveform = () => {
-    const barWidth = 4; // Width of each bar
-    const barSpacing = 2; // Spacing between bars
-    const centerY = 50; // Center of the waveform
+    const barWidth = 4; 
+    const barSpacing = 2; 
+    const centerY = 50;
 
     return amplitudes.map((value, index) => (
       <Rect
         key={index}
         x={index * (barWidth + barSpacing)}
-        y={centerY - value / 2} // Center the bars vertically
+        y={centerY - value / 2} 
         width={barWidth}
         height={value}
-        rx={2} // Rounded corners
-        fill={index <= playheadPosition ? '#0ABAB5' : '#E0E0E0'} // Dynamic color
+        rx={2} 
+        fill={index <= playheadPosition ? '#0ABAB5' : '#E0E0E0'}
       />
     ));
   };
@@ -161,7 +156,7 @@ export function WaveformVisualizer() {
           {renderWaveform()}
           {/* Playhead */}
           <Circle
-            cx={playheadPosition * 6} // Adjust for bar width and spacing
+            cx={playheadPosition * 6} 
             cy="50"
             r="5"
             fill="#0ABAB5"
