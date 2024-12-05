@@ -1,15 +1,18 @@
-import React, { useState, useRef } from 'react';
-import { StyleSheet, View, TouchableOpacity, ScrollView } from 'react-native';
+import React, { useRef, useState } from 'react';
+import { Image, StyleSheet, Platform } from 'react-native';
+import {View, TouchableOpacity, ScrollView, Text } from 'react-native';
 import { Audio } from 'expo-av';
 import Svg, { Rect, Circle } from 'react-native-svg';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 
-export function WaveformVisualizer() {
+
+export default function HomeScreen() {
   const [recordings, setRecordings] = useState([]);
   const [currentRecording, setCurrentRecording] = useState(null);
   const [isRecording, setIsRecording] = useState(false);
+  const [timer, setTimer] = useState(0);
 
-  const animationInterval = useRef(null);
+  const timerRef = useRef(null);
 
   const RECORDING_OPTIONS = {
     android: {
@@ -49,9 +52,10 @@ export function WaveformVisualizer() {
       setCurrentRecording(recording);
       setIsRecording(true);
 
-      animationInterval.current = setInterval(() => {
-        // Simulate waveform animation
-      }, 100);
+      // Start the timer
+      timerRef.current = setInterval(() => {
+        setTimer((prev) => prev + 1);
+      }, 1000);
     } catch (err) {
       console.error('Error starting recording:', err);
     }
@@ -61,7 +65,9 @@ export function WaveformVisualizer() {
     try {
       if (!currentRecording) return;
 
-      clearInterval(animationInterval.current);
+      clearInterval(timerRef.current);
+      setTimer(0);
+
       await currentRecording.stopAndUnloadAsync();
 
       await Audio.setAudioModeAsync({
@@ -81,40 +87,43 @@ export function WaveformVisualizer() {
     }
   };
 
+  const deleteRecording = () => {
+    clearInterval(timerRef.current);
+    setTimer(0);
+    setCurrentRecording(null);
+    setIsRecording(false);
+  };
+
   const togglePlayback = async (index) => {
     const recording = recordings[index];
     if (!recording) return;
-  
+
     const { sound, isPlaying } = recording;
-  
+
     if (isPlaying) {
       await sound.pauseAsync();
       updateRecordingState(index, { isPlaying: false });
     } else {
-      // Check if the sound needs to be reloaded
       const status = await sound.getStatusAsync();
       if (status.didJustFinish || status.positionMillis === status.durationMillis) {
-        await sound.setPositionAsync(0); // Reset the playback position to the beginning
+        await sound.setPositionAsync(0);
       }
-  
+
       await sound.playAsync();
       updateRecordingState(index, { isPlaying: true });
-  
+
       sound.setOnPlaybackStatusUpdate((status) => {
         if (status.isLoaded) {
           const playheadPosition = (status.positionMillis / status.durationMillis) * 100;
           updateRecordingState(index, { playheadPosition });
-  
-          if (status.didJustFinish) {
 
+          if (status.didJustFinish) {
             updateRecordingState(index, { isPlaying: false, playheadPosition: 0 });
           }
         }
       });
     }
   };
-  
-  
 
   const updateRecordingState = (index, updates) => {
     setRecordings((prev) =>
@@ -123,12 +132,13 @@ export function WaveformVisualizer() {
   };
 
   const renderWaveform = (amplitudes, playheadPosition) => {
-    const barWidth = 4;
-    const barSpacing = 2;
-    const centerY = 50;
-
+    const barWidth = 1.1; 
+    const barSpacing = 4.3;
+    const centerY = 50; 
+    const waveformWidth = amplitudes.length * (barWidth + barSpacing); 
+  
     return (
-      <Svg height="100" width="100%">
+      <Svg height="100" width={waveformWidth}>
         {amplitudes.map((value, index) => (
           <Rect
             key={index}
@@ -141,64 +151,99 @@ export function WaveformVisualizer() {
           />
         ))}
         <Circle
-          cx={playheadPosition * 2.2} // Blue playhead ahead of white progress
+          cx={playheadPosition * 2.9}
           cy="50"
-          r="5"
+          r="5.7"
           fill="#0ABAB5"
         />
       </Svg>
     );
   };
+  
+
+  const formatTime = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+  };
 
   return (
     <View style={styles.container}>
-      <View style={styles.controls}>
-        {isRecording ? (
-          <TouchableOpacity onPress={stopRecording}>
-            <Ionicons name="stop-circle" size={50} color="#FF3B30" />
-          </TouchableOpacity>
-        ) : (
-          <TouchableOpacity onPress={startRecording}>
+      {isRecording ? (
+        <View style={styles.recordingUI}>
+          <Text style={styles.timer}>{formatTime(timer)}</Text>
+          <View style={styles.buttonContainer}>
+            <TouchableOpacity onPress={stopRecording}>
+              <Ionicons name="stop-circle" size={50} color="#FF3B30" />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={deleteRecording}>
+              <Ionicons name="trash" size={50} color="#FF3B30" />
+            </TouchableOpacity>
+          </View>
+        </View>
+      ) : (
+        <View>
+          <TouchableOpacity onPress={startRecording} style={styles.startButton}>
             <Ionicons name="mic-circle" size={50} color="#0ABAB5" />
           </TouchableOpacity>
-        )}
-      </View>
-      <ScrollView style={styles.recordingsList}>
-        {recordings.map((recording, index) => (
-          <View key={index} style={styles.recordingItem}>
-            <TouchableOpacity onPress={() => togglePlayback(index)}>
-              <Ionicons
-                name={recording.isPlaying ? 'pause-circle' : 'play-circle'}
-                size={40}
-                color="#0ABAB5"
-              />
-            </TouchableOpacity>
-            {renderWaveform(recording.amplitudes, recording.playheadPosition || 0)}
-          </View>
-        ))}
-      </ScrollView>
+          <ScrollView style={styles.recordingsList}>
+            {recordings.map((recording, index) => (
+              <View key={index} style={styles.manna} >
+                <TouchableOpacity onPress={() => togglePlayback(index)}>
+                  <Ionicons
+                    name={recording.isPlaying ? 'pause-circle' : 'play-circle'}
+                    size={50}
+                    color="#0ABAB5"
+                  />
+                </TouchableOpacity>
+                <View>
+                {renderWaveform(recording.amplitudes, recording.playheadPosition || 0)}
+                </View>
+              </View>
+            ))}
+          </ScrollView>
+        </View>
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    marginVertical: 16,
     flex: 1,
+    marginTop:90,
+    padding:20,
+    paddingBottom:40
+
+
   },
-  controls: {
+
+  timer: {
+    fontSize: 24,
+    color: '#FFF',
+    marginBottom: 16,
+     backgroundColor:"blue",
+     padding:10
+  },
+  buttonContainer: {
     flexDirection: 'row',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
+    width: '60%',
+  },
+  startButton: {
     alignItems: 'center',
-    marginVertical: 16,
   },
   recordingsList: {
-    marginTop: 16,
+    marginBottom:140
   },
-  recordingItem: {
-    marginBottom: 16,
-    backgroundColor: '#1F2A30',
+  manna:{
+    flexDirection:"row",
+    alignItems:"center",
+    borderColor:"red",
+    borderWidth:1,
+    gap:5,
+    marginBottom: 26,
     borderRadius: 8,
-    padding: 10,
-  },
+  }
+  
 });
