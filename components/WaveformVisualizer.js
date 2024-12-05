@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { StyleSheet, View, TouchableOpacity, ScrollView } from 'react-native';
 import { Audio } from 'expo-av';
-import Svg, { Rect, Circle, Line } from 'react-native-svg';
+import Svg, { Rect, Circle } from 'react-native-svg';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 
 export function WaveformVisualizer() {
@@ -50,7 +50,7 @@ export function WaveformVisualizer() {
       setIsRecording(true);
 
       animationInterval.current = setInterval(() => {
-        // Simulate waveform animation (real amplitude capture can be added here)
+        // Simulate waveform animation
       }, 100);
     } catch (err) {
       console.error('Error starting recording:', err);
@@ -72,7 +72,7 @@ export function WaveformVisualizer() {
       const { sound } = await currentRecording.createNewLoadedSoundAsync();
       setRecordings((prev) => [
         ...prev,
-        { sound, amplitudes: [...Array(50).keys()].map(() => Math.random() * 40 + 20) },
+        { sound, amplitudes: [...Array(50).keys()].map(() => Math.random() * 40 + 20), playheadPosition: 0 },
       ]);
       setCurrentRecording(null);
       setIsRecording(false);
@@ -84,28 +84,37 @@ export function WaveformVisualizer() {
   const togglePlayback = async (index) => {
     const recording = recordings[index];
     if (!recording) return;
-
+  
     const { sound, isPlaying } = recording;
-
+  
     if (isPlaying) {
       await sound.pauseAsync();
       updateRecordingState(index, { isPlaying: false });
     } else {
-      await sound.replayAsync();
+      // Check if the sound needs to be reloaded
+      const status = await sound.getStatusAsync();
+      if (status.didJustFinish || status.positionMillis === status.durationMillis) {
+        await sound.setPositionAsync(0); // Reset the playback position to the beginning
+      }
+  
+      await sound.playAsync();
       updateRecordingState(index, { isPlaying: true });
-
+  
       sound.setOnPlaybackStatusUpdate((status) => {
         if (status.isLoaded) {
           const playheadPosition = (status.positionMillis / status.durationMillis) * 100;
           updateRecordingState(index, { playheadPosition });
-
+  
           if (status.didJustFinish) {
+
             updateRecordingState(index, { isPlaying: false, playheadPosition: 0 });
           }
         }
       });
     }
   };
+  
+  
 
   const updateRecordingState = (index, updates) => {
     setRecordings((prev) =>
@@ -128,16 +137,14 @@ export function WaveformVisualizer() {
             width={barWidth}
             height={value}
             rx={2}
-            fill={index <= playheadPosition ? '#0ABAB5' : '#E0E0E0'}
+            fill={index <= playheadPosition / 2 ? '#0ABAB5' : '#E0E0E0'}
           />
         ))}
-        <Line
-          x1={playheadPosition * (barWidth + barSpacing)}
-          y1="0"
-          x2={playheadPosition * (barWidth + barSpacing)}
-          y2="100"
-          stroke="white"
-          strokeWidth="2"
+        <Circle
+          cx={playheadPosition * 2.2} // Blue playhead ahead of white progress
+          cy="50"
+          r="5"
+          fill="#0ABAB5"
         />
       </Svg>
     );
