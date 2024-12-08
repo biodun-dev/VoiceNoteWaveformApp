@@ -52,7 +52,6 @@ export default function HomeScreen() {
       setCurrentRecording(recording);
       setIsRecording(true);
 
-      // Start the timer
       timerRef.current = setInterval(() => {
         setTimer((prev) => prev + 1);
       }, 1000);
